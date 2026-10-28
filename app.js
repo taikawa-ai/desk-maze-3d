@@ -8,7 +8,8 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 const STORE_KEY = 'deskmaze.v1';
-const SNAP = 5;          // 位置と長さは5cm刻み
+const SNAP = 5;          // 壁を動かすときは5cm刻み
+const DRAW_SNAP = 30;    // 描くときは30cm刻み(ベニヤ90・机60がそろう)
 const MIN_LEN = 30;      // これより短いドラッグは壁にしない
 const STACK = 2;
 
@@ -52,6 +53,7 @@ function undo() {
 }
 const nextId = () => state.walls.reduce((m, w) => Math.max(m, w.id), 0) + 1;
 const snap = v => Math.round(v / SNAP) * SNAP;
+const snapD = v => Math.round(v / DRAW_SNAP) * DRAW_SNAP;
 const sel = () => state.walls.find(w => w.id === selId) || null;
 const wallLabel = w => w.name || `壁${state.walls.indexOf(w) + 1}`;
 
@@ -149,15 +151,15 @@ function renderPlan(ctx, v, opt = {}) {
     const b = state.bg, w = b.w * s, h = w * bgImg.height / bgImg.width;
     ctx.globalAlpha = b.op; ctx.drawImage(bgImg, X(-b.x), Y(-b.y), w, h); ctx.globalAlpha = 1;
   }
-  // 方眼(10cm / 50cm / 100cm)
-  const step = s * 10 < 6 ? 50 : 10;
+  // 方眼
+  const step = s * 30 < 6 ? 90 : 30;   // 方眼は描く刻み(30cm)、濃い線はベニヤ1枚(90cm)
   ctx.lineWidth = 1;
-  for (let x = 0; x <= R.w; x += step) { ctx.strokeStyle = x % 100 ? '#eee' : '#ccc'; ctx.beginPath(); ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(R.d)); ctx.stroke(); }
-  for (let y = 0; y <= R.d; y += step) { ctx.strokeStyle = y % 100 ? '#eee' : '#ccc'; ctx.beginPath(); ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(R.w), Y(y)); ctx.stroke(); }
+  for (let x = 0; x <= R.w; x += step) { ctx.strokeStyle = x % 90 ? '#eee' : '#ccc'; ctx.beginPath(); ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(R.d)); ctx.stroke(); }
+  for (let y = 0; y <= R.d; y += step) { ctx.strokeStyle = y % 90 ? '#eee' : '#ccc'; ctx.beginPath(); ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(R.w), Y(y)); ctx.stroke(); }
   ctx.fillStyle = '#999'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-  for (let x = 0; x <= R.w; x += 100) ctx.fillText(x, X(x), Y(0) - 4);
+  for (let x = 0; x <= R.w; x += 90) ctx.fillText(x, X(x), Y(0) - 4);
   ctx.textAlign = 'right';
-  for (let y = 100; y <= R.d; y += 100) ctx.fillText(y, X(0) - 4, Y(y) + 4);
+  for (let y = 90; y <= R.d; y += 90) ctx.fillText(y, X(0) - 4, Y(y) + 4);
   // 教室の壁と入口
   ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
   ctx.strokeRect(X(0), Y(0), R.w * s, R.d * s);
@@ -229,7 +231,7 @@ planCv.addEventListener('pointerdown', e => {
   }
   if (pointers.size > 2) return;
   const p = localPt(e), wp = toWorld(p.x, p.y);
-  if (mode === 'draw') drawing = { start: { x: snap(wp.x), y: snap(wp.y) }, sx: p.x, sy: p.y, w: null, moved: false };
+  if (mode === 'draw') drawing = { start: { x: snapD(wp.x), y: snapD(wp.y) }, sx: p.x, sy: p.y, w: null, moved: false };
   else if (mode === 'select') {
     const w = wallAt(wp);
     if (w) { selId = w.id; dragging = { w, p0: wp, x0: w.x, y0: w.y, moved: false }; updateUI(); }
@@ -240,7 +242,8 @@ planCv.addEventListener('pointerdown', e => {
 planCv.addEventListener('pointermove', e => {
   if (!pointers.has(e.pointerId)) {   // マウスを動かしただけ: 位置を表示
     const p = localPt(e), wp = toWorld(p.x, p.y);
-    setHint(`左から ${snap(wp.x)} cm ・ 上から ${snap(wp.y)} cm`);
+    const f = mode === 'draw' ? snapD : snap;
+    setHint(`左から ${f(wp.x)} cm ・ 上から ${f(wp.y)} cm`);
     return;
   }
   pointers.set(e.pointerId, localPt(e));
@@ -255,7 +258,7 @@ planCv.addEventListener('pointermove', e => {
   }
   const wp = toWorld(p.x, p.y);
   if (drawing) {
-    const st = drawing.start, dx = snap(wp.x) - st.x, dy = snap(wp.y) - st.y;
+    const st = drawing.start, dx = snapD(wp.x) - st.x, dy = snapD(wp.y) - st.y;
     drawing.sx = p.x; drawing.sy = p.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) >= MIN_LEN) drawing.moved = true;
     if (drawing.moved) {
@@ -302,7 +305,7 @@ planCv.addEventListener('wheel', e => {
 }, { passive: false });
 
 const HINTS = {
-  draw: '指でなぞると壁になります(横か縦にそろいます)。2本指で拡大・移動。',
+  draw: '指でなぞると壁になります(30cm刻み・横か縦にそろいます)。2本指で拡大・移動。',
   select: '壁をタップで選び、ドラッグで動かします。何もない所をドラッグすると図面が動きます。2本指で拡大。',
 };
 function setHint(t) { document.getElementById('hint').textContent = t; }
