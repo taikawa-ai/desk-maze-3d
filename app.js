@@ -303,8 +303,7 @@ planCv.addEventListener('wheel', e => {
 
 const HINTS = {
   draw: '指でなぞると壁になります(横か縦にそろいます)。2本指で拡大・移動。',
-  select: '壁をタップで選ぶ・そのままドラッグで動かす。',
-  pan: '指で図面を動かします。2本指で拡大。',
+  select: '壁をタップで選び、ドラッグで動かします。何もない所をドラッグすると図面が動きます。2本指で拡大。',
 };
 function setHint(t) { document.getElementById('hint').textContent = t; }
 function setMode(m) {
