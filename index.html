@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>机とベニヤの迷路づくり</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body data-tab="plan">
+<header>
+  <h1>机とベニヤの迷路づくり</h1>
+  <nav id="tabs">
+    <button data-tab="plan" class="view-tab">図面</button>
+    <button data-tab="three" class="view-tab">3D</button>
+    <button data-tab="wall">壁</button>
+    <button data-tab="count">数</button>
+    <button data-tab="room">教室・保存</button>
+  </nav>
+</header>
+
+<main>
+  <section id="planView" class="view">
+    <canvas id="plan"></canvas>
+    <div class="toolbar">
+      <div class="seg" id="modes">
+        <button data-mode="draw">✏️ 描く</button>
+        <button data-mode="select">👆 選ぶ</button>
+        <button data-mode="pan">✋ 動かす</button>
+      </div>
+      <button id="fitPlan">全体</button>
+      <button id="undo">↩︎ 戻す</button>
+    </div>
+    <div class="toolbar bottom" id="selBar" hidden>
+      <span id="selLabel"></span>
+      <button id="selRotate">向き</button>
+      <button id="selFace">ベニヤの面</button>
+      <button id="selDup">複製</button>
+      <button id="selDel" class="danger">削除</button>
+    </div>
+    <div id="hint"></div>
+  </section>
+
+  <section id="threeView" class="view">
+    <canvas id="three"></canvas>
+    <div class="toolbar">
+      <button id="viewOrbit">ぐるっと</button>
+      <button id="viewTop">真上</button>
+      <button id="viewWalk">歩く</button>
+      <label class="chk"><input type="checkbox" id="showRoom" checked>教室の壁</label>
+    </div>
+    <div id="walkPad" hidden>
+      <button data-walk="fwd" class="pad-up">▲</button>
+      <button data-walk="left" class="pad-left">⟲</button>
+      <button data-walk="right" class="pad-right">⟳</button>
+      <button data-walk="back" class="pad-down">▼</button>
+    </div>
+  </section>
+
+  <aside id="panel">
+    <div class="pane" data-pane="wall">
+      <h2>選んだ壁</h2>
+      <div id="selEdit">
+        <p class="muted" id="selNone">図面で「選ぶ」にして壁をタップすると、ここで数字を直せます。</p>
+        <div id="selFields" hidden>
+          <div class="grid">
+            <label>左から(cm)<input type="number" inputmode="numeric" step="5" data-f="x"></label>
+            <label>上から(cm)<input type="number" inputmode="numeric" step="5" data-f="y"></label>
+            <label>長さ(cm)<input type="number" inputmode="numeric" step="5" data-f="len"></label>
+            <label>向き<select data-f="dir"><option value="h">横</option><option value="v">縦</option></select></label>
+            <label>ベニヤの面<select data-f="face"><option value="a">上 / 左</option><option value="b">下 / 右</option></select></label>
+            <label>名前<input type="text" data-f="name" placeholder="なくてもよい"></label>
+          </div>
+        </div>
+      </div>
+
+      <h2>数字で壁を足す</h2>
+      <div class="grid" id="addForm">
+        <label>左から(cm)<input type="number" inputmode="numeric" step="5" name="x" value="0"></label>
+        <label>上から(cm)<input type="number" inputmode="numeric" step="5" name="y" value="0"></label>
+        <label>長さ(cm)<input type="number" inputmode="numeric" step="5" name="len" value="180"></label>
+        <label>向き<select name="dir"><option value="h">横</option><option value="v">縦</option></select></label>
+        <label>ベニヤの面<select name="face"><option value="a">上 / 左</option><option value="b">下 / 右</option></select></label>
+        <button id="addWall" class="primary">壁を足す</button>
+      </div>
+      <p class="muted">「左から」「上から」は、教室の左上の角から壁の左上の角までの長さです。壁の厚みは机の奥行き(40cm)です。</p>
+
+      <h2>壁の一覧</h2>
+      <ol id="wallList"></ol>
+    </div>
+
+    <div class="pane" data-pane="count">
+      <h2>必要な数</h2>
+      <div id="totals"></div>
+      <h2>注意</h2>
+      <ul id="warnings"></ul>
+      <h2>壁ごと</h2>
+      <table id="countTable"></table>
+    </div>
+
+    <div class="pane" data-pane="room">
+      <h2>教室</h2>
+      <div class="grid">
+        <label>横の長さ(cm)<input type="number" inputmode="numeric" step="5" data-r="room.w"></label>
+        <label>縦の長さ(cm)<input type="number" inputmode="numeric" step="5" data-r="room.d"></label>
+        <label>入口の壁<select data-r="room.door.side">
+          <option value="top">上</option><option value="right">右</option>
+          <option value="bottom">下</option><option value="left">左</option></select></label>
+        <label>入口の位置(cm)<input type="number" inputmode="numeric" step="5" data-r="room.door.pos"></label>
+        <label>入口の幅(cm)<input type="number" inputmode="numeric" step="5" data-r="room.door.w"></label>
+        <label>天井の高さ(cm)<input type="number" inputmode="numeric" step="10" data-r="room.h"></label>
+      </div>
+      <p class="muted">入口の位置は、上・下の壁なら左端から、左・右の壁なら上端からの長さです。</p>
+
+      <h2>材料の大きさ</h2>
+      <div class="grid">
+        <label>ベニヤの幅(cm)<input type="number" inputmode="numeric" data-r="rule.panelW"></label>
+        <label>ベニヤの高さ(cm)<input type="number" inputmode="numeric" data-r="rule.panelH"></label>
+        <label>机の幅(cm)<input type="number" inputmode="numeric" data-r="rule.deskW"></label>
+        <label>机の奥行き(cm)<input type="number" inputmode="numeric" data-r="rule.deskD"></label>
+        <label>机の高さ(cm)<input type="number" inputmode="numeric" data-r="rule.deskH"></label>
+      </div>
+      <p class="muted">決まり: ベニヤ1枚に机1か所。机は2段で、上の机は逆さにして天板どうしを合わせます。</p>
+
+      <h2>下書きの写真</h2>
+      <div class="grid">
+        <label class="wide">写真を選ぶ<input type="file" accept="image/*" id="bgFile"></label>
+        <label>写真の横幅(cm)<input type="number" inputmode="numeric" step="10" id="bgW"></label>
+        <label>濃さ<input type="range" min="0" max="1" step="0.05" id="bgOp"></label>
+        <label>左へずらす(cm)<input type="number" inputmode="numeric" step="5" id="bgX"></label>
+        <label>上へずらす(cm)<input type="number" inputmode="numeric" step="5" id="bgY"></label>
+        <button id="bgClear">写真を消す</button>
+      </div>
+      <p class="muted">手描きの図面の写真を下に透かして、上から壁をなぞれます。写真はこの端末の中だけで使い、どこにも送りません。</p>
+
+      <h2>保存・書き出し</h2>
+      <div class="btns">
+        <button id="saveJson" class="primary">図面を保存(.json)</button>
+        <label class="btn">図面を開く(.json)<input type="file" accept=".json,application/json" id="loadJson" hidden></label>
+        <button id="exportPng">上から見た図(.png)</button>
+        <button id="exportGlb">3Dデータ(.glb)</button>
+        <button id="exportObj">3Dデータ(.obj)</button>
+      </div>
+      <p class="muted">.glb は Blender、.obj は Fusion(「メッシュを挿入」)で開けます。作業中の図面は、この端末に自動で残ります。</p>
+      <div class="btns">
+        <button id="loadSample">見本の図面を読む</button>
+        <button id="clearAll" class="danger">全部消す</button>
+      </div>
+    </div>
+  </aside>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
