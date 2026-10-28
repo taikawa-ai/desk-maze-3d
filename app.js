@@ -558,6 +558,15 @@ document.getElementById('selDel').onclick = () => {
   const w = sel(); if (!w) return; snapshot();
   state.walls = state.walls.filter(x => x !== w); selId = null; changed();
 };
+// 選んだ壁を Delete / Backspace で消す(数字の入力中は消さない)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  const t = e.target;
+  if (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName)) return;
+  if (!sel()) return;
+  e.preventDefault();
+  document.getElementById('selDel').click();
+});
 document.getElementById('addWall').onclick = () => {
   const f = n => document.querySelector(`#addForm [name=${n}]`).value;
   const len = Number(f('len'));
